@@ -1,0 +1,45 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git branch *)",
+      "Bash(git checkout *)",
+      "Bash(find *)",
+      "Bash(grep *)",
+      "Bash(wc *)",
+      "Bash(cat *)",
+      "Bash(ls *)",
+      "Bash(mkdir *)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '=== POST-COMPACTION CONTEXT REFRESH ==='; if [ -f \"$CLAUDE_PROJECT_DIR/CLAUDE.md\" ]; then head -30 \"$CLAUDE_PROJECT_DIR/CLAUDE.md\"; fi; echo '---'; if [ -f \"$CLAUDE_PROJECT_DIR/.claude/transfer-context.json\" ]; then echo 'Transfer context available at .claude/transfer-context.json'; fi; echo 'Skills: /dev /wrap-up /tdd /debug /learn /phase-review /skill-check'; echo 'Read Session Handoff in CLAUDE.md for current state.'",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "osascript -e 'display notification \"Claude needs your attention\" with title \"Claude Forge\"' 2>/dev/null || notify-send 'Claude Forge' 'Claude needs your attention' 2>/dev/null || true",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
