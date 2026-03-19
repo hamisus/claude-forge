@@ -15,7 +15,7 @@ Claude Forge packages the best Claude Code workflow practices into a reusable te
 
 ```bash
 # Clone for a new project
-git clone https://github.com/your-username/claude-forge my-project
+git clone https://github.com/hamisus/claude-forge my-project
 cd my-project
 git init  # Fresh git history for your project
 

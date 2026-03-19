@@ -281,7 +281,7 @@ Here's how a developer uses Claude Forge from day one:
 
 ```
 # Clone the template
-git clone https://github.com/you/claude-forge my-new-project
+git clone https://github.com/hamisus/claude-forge my-new-project
 cd my-new-project
 
 # Start Claude Code
