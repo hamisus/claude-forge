@@ -36,6 +36,7 @@
 | `@test-writer` | Need tests | Generates comprehensive tests |
 | `@doc-keeper` | Periodically | Checks doc accuracy |
 
+<!-- BOOTSTRAP_PRESERVE_BEGIN: context-thresholds -->
 ## Context Management
 
 | Context % | Action |
@@ -43,6 +44,7 @@
 | 0-60% | Normal work |
 | 60% | Consider `/wrap-up` + `/clear` |
 | 80% | MUST `/wrap-up` + `/clear` — quality degrades beyond this |
+<!-- BOOTSTRAP_PRESERVE_END: context-thresholds -->
 
 ## Provocation Prompts
 
@@ -53,13 +55,15 @@ When output quality drops:
 - "What would a senior engineer say?"
 - "Is there a simpler way?"
 
+<!-- BOOTSTRAP_PRESERVE_BEGIN: quality-scoring -->
 ## Quality Scoring (Phase Review)
 
 | Dimension | Max | What it measures |
 |-----------|-----|-----------------|
 | Completeness | 20 | All deliverables built? |
 | Code Quality | 20 | Clean architecture? |
-| Test Coverage | 20 | Tests pass? Edge cases? |
+| Test Quality | 20 | Useful tests per `.claude/rules/useful-tests.md`? End-to-end coverage? |
 | Design/UX | 20 | Looks right? Accessible? |
 | Documentation | 20 | Docs updated? Lessons saved? |
 | **Threshold** | **80** | **Below = fix before proceeding** |
+<!-- BOOTSTRAP_PRESERVE_END: quality-scoring -->

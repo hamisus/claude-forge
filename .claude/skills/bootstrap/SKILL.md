@@ -16,12 +16,15 @@ This skill takes your completed specification (output from `/spec`) and generate
 A Claude Forge project runs best when Claude Code is configured specifically for that project — custom hooks, tailored skills, stack-specific rules, and agents.
 
 Bootstrap generates:
-- **CLAUDE.md** — Project overview, how to run, key conventions, compaction instructions
+- **Root `CLAUDE.md`** *(REPLACED)* — Project overview, how to run, key conventions, preserved workflow content (provocations, context thresholds, quality scoring)
+- **Root `README.md`** *(REPLACED)* — Project name, mission, stack, run instructions, phase summary
 - **Hooks** — Stack-specific linting, code generation, testing, notifications
 - **Custom Skills** — Component generation, model creation, test writing
 - **Custom Rules** — Code style and pattern rules by layer (frontend, backend, data)
 - **Custom Agents** — Code reviewer and test writer with stack-specific checklists
 - **Permissions** — Stack-specific CLI commands that are safe to auto-run
+- **Cleanup** — `docs/workflow-guide.md` is inlined into the new `CLAUDE.md`, then deleted (its content lives in CLAUDE.md going forward)
+- **Backups** — Pre-existing root `CLAUDE.md` / `README.md` are backed up to `.claude/backups/<file>.<timestamp>` before overwrite (see "Backup Safeguard" below)
 
 **Prerequisites:** You must have run `/scope` and `/spec` first.
 
@@ -44,34 +47,57 @@ The skill will:
 
 ## Generated Files
 
-All files are created in `.claude/` and `.claude/skills/`, `.claude/rules/`, `.claude/agents/`:
+Files are created at the **project root** (CLAUDE.md, README.md) and inside `.claude/`:
 
 ```
-.claude/
-├── CLAUDE.md                          (NEW: project overview)
-├── settings.json                      (UPDATED: hooks + permissions)
-├── skills/
-│   ├── new-component.md               (NEW: component/screen generator)
-│   ├── new-model.md                   (NEW: data model generator)
-│   ├── new-test.md                    (NEW: test writer)
-│   └── [existing skills preserved]
-├── rules/
-│   ├── frontend-code.md               (NEW: UI code rules)
-│   ├── backend-code.md                (NEW: API/logic code rules)
-│   ├── data-code.md                   (NEW: database/model rules)
-│   └── [existing rules preserved]
-├── agents/
-│   ├── code-reviewer.md               (UPDATED: stack-specific review checklist)
-│   └── test-writer.md                 (UPDATED: stack-specific test patterns)
-└── [other existing files preserved]
+<project-root>/
+├── CLAUDE.md                          (REPLACED: project overview + preserved workflow content)
+├── README.md                          (REPLACED: project name, stack, run instructions, phases)
+├── docs/
+│   └── workflow-guide.md              (DELETED: content inlined into CLAUDE.md)
+└── .claude/
+    ├── settings.json                  (UPDATED: hooks + permissions)
+    ├── backups/
+    │   ├── CLAUDE.md.<timestamp>      (NEW: pre-existing root CLAUDE.md, if any)
+    │   └── README.md.<timestamp>      (NEW: pre-existing root README.md, if any)
+    ├── skills/
+    │   ├── new-component.md           (NEW: component/screen generator)
+    │   ├── new-model.md               (NEW: data model generator)
+    │   ├── new-test.md                (NEW: test writer)
+    │   └── [existing skills preserved]
+    ├── rules/
+    │   ├── frontend-code.md           (NEW: UI code rules)
+    │   ├── backend-code.md            (NEW: API/logic code rules)
+    │   ├── data-code.md               (NEW: database/model rules)
+    │   ├── useful-tests.md            (PRESERVED: test quality rule from Forge)
+    │   └── [existing rules preserved]
+    ├── agents/
+    │   ├── code-reviewer.md           (UPDATED: stack-specific review checklist)
+    │   └── test-writer.md             (UPDATED: stack-specific test patterns)
+    └── [other existing files preserved]
 ```
+
+> **Note:** Bootstrap **replaces** the root `CLAUDE.md` and `README.md` that ship with the Forge starter. These starters describe Claude Forge itself; after bootstrap, the project owns those files. See "Backup Safeguard" below — pre-existing files are always backed up before overwrite.
 
 ---
 
-## Generated File 1: CLAUDE.md
+## Generated File 1: CLAUDE.md (root)
 
 ### Purpose
-The master project reference. Always read this first when jumping into a session.
+The master project reference. Lives at the **project root**, not `.claude/`. Always read this first when jumping into a session.
+
+### Source of content
+
+The new CLAUDE.md is assembled from three sources:
+
+1. **Project-specific content** — derived from `PROJECT_SPEC.md`, `ARCHITECTURE.md`, `PHASES.md` (sections below).
+2. **Preserved workflow content** — extracted verbatim from the Forge starter using `<!-- BOOTSTRAP_PRESERVE_BEGIN: <name> -->` / `<!-- BOOTSTRAP_PRESERVE_END: <name> -->` markers. Required preserved blocks:
+   - `provocation` — Provocation Prompts (from starter root `CLAUDE.md`)
+   - `context-management` — Context Management rules (from starter root `CLAUDE.md`)
+   - `compaction` — Compaction Instructions (from starter root `CLAUDE.md`)
+   - `context-thresholds` — Context % thresholds table (from `docs/workflow-guide.md`)
+   - `quality-scoring` — Quality Scoring rubric (from `docs/workflow-guide.md`)
+3. **Removed content** — all "Claude Forge is a universal bootstrap…" prose, Getting Started instructions targeting the Forge `/scope`/`/spec`/`/bootstrap` flow, and any reference to `claude-forge` as the project identity.
 
 ### Sections
 
@@ -168,8 +194,10 @@ Document the rules that everything must follow:
 - Dev errors include stack traces in logs only
 
 **Testing:**
-- 80%+ line coverage for business logic
-- Integration tests for critical flows
+- TDD-default per `/dev` (silent skips forbidden; log `tdd-skip-reason` if genuinely opting out)
+- Tests must be **useful** per `.claude/rules/useful-tests.md` — drive code through public entry points, assert observable behavior, would catch plausible mutations
+- ≥1 end-to-end test per feature
+- Documented edge cases from `PROJECT_SPEC.md` each have a test
 - Tests live alongside source files
 ```
 
@@ -216,6 +244,7 @@ How to know the project is in good shape:
 **Before committing:**
 - [ ] `npm run lint` passes (or equivalent for your stack)
 - [ ] `npm run test` passes (or equivalent)
+- [ ] **Useful Tests Gate** passed (per `.claude/rules/useful-tests.md`) — `useful-tests-audit:` block present in commit body
 - [ ] No console errors in dev tools
 - [ ] Manual smoke test of the happy path
 
@@ -282,7 +311,107 @@ How to get the best results from Claude:
 
 ---
 
-## Generated File 2: settings.json
+## Generated File 2: README.md (root)
+
+### Purpose
+The public-facing project reference. Lives at the **project root**, replaces the Forge starter README that describes Claude Forge itself.
+
+### Source of content
+- **Name + tagline** — from `project_name` and `tldr` in `project-scope.json`.
+- **What it does** — from `description` and `vision_statement` in `project-scope.json`.
+- **Stack** — from `tech_stack` in `project-scope.json` and the Stack Rationale section of `ARCHITECTURE.md`.
+- **Run instructions** — from CLAUDE.md's Getting Started section (same commands; README mirrors them for new contributors who haven't read CLAUDE.md yet).
+- **Phase summary** — extracted from `PHASES.md` (one line per phase: name + deliverable).
+
+### Template
+
+```markdown
+# {{project_name}}
+
+> {{tldr}}
+
+{{description}}
+
+## Stack
+
+- **Frontend:** {{tech_stack.frontend}}
+- **Backend:** {{tech_stack.backend}}
+- **Database:** {{tech_stack.database}}
+- **Auth:** {{tech_stack.auth}}
+- **Hosting:** {{tech_stack.hosting}}
+
+See `.claude/specs/ARCHITECTURE.md` for the full Stack Rationale (researched library choices with tradeoffs).
+
+## Getting Started
+
+```bash
+# 1. Clone
+git clone {{repo_url}} && cd {{project_slug}}
+
+# 2. Install
+{{install_command}}
+
+# 3. Configure
+cp .env.example .env  # then fill in values
+
+# 4. Run
+{{dev_command}}
+```
+
+Then open {{local_url}}.
+
+## Development
+
+This project uses [Claude Forge](https://github.com/hamisus/claude-forge) workflow conventions:
+
+- **`/dev <feature>`** — plan → TDD → verify loop (TDD-default per `.claude/rules/useful-tests.md`)
+- **`/wrap-up`** — end a session: commit, capture lessons, update handoff
+- **`/phase-review`** — phase audit + 5-dimension quality score (≥80 to ship)
+
+See `CLAUDE.md` for the full workflow guide and `.claude/specs/` for the project's specification suite.
+
+## Project Phases
+
+{{phase_summary_from_PHASES_md}}
+
+## License
+
+{{license}}
+```
+
+### Removed content (vs. Forge starter)
+
+- All "Claude Forge is a universal bootstrap" content
+- The "Quick Start" section that points at `/scope` → `/spec` → `/bootstrap`
+- The "What's Included" directory listing of the Forge template
+
+---
+
+## Backup Safeguard
+
+Replacing root `CLAUDE.md` and `README.md` is **destructive**. Before any overwrite:
+
+1. **Detect divergence** — compute sha256 of the current root `CLAUDE.md` / `README.md` and compare against the known-starter manifest (sha256 of the file as shipped in Claude Forge).
+2. **Always back up** — copy to `.claude/backups/<file>.<ISO-timestamp>` regardless of divergence. Cheap insurance.
+3. **Refuse on hand-edits without `--force`** — if the sha256 differs from the starter (i.e., the file has been hand-edited), bootstrap halts and prints:
+   ```
+   Root CLAUDE.md has been hand-edited (sha256 differs from Forge starter).
+   The original has been backed up to .claude/backups/CLAUDE.md.<timestamp>.
+   To proceed and overwrite anyway, re-run with: /bootstrap --force
+   To preserve hand-edited content, copy it manually from the backup before re-running.
+   ```
+4. **`--force` proceeds anyway** — backup is still written. User accepts that hand-edits are lost in the new file but recoverable from `.claude/backups/`.
+5. **Backup retention** — bootstrap does not prune. User manages `.claude/backups/` size manually (it's small — two markdown files per re-bootstrap).
+
+The `docs/workflow-guide.md` deletion follows the same pattern: backed up to `.claude/backups/workflow-guide.md.<timestamp>` before deletion.
+
+### Known starter sha256
+
+To detect divergence, bootstrap embeds the sha256 of the Forge starter `CLAUDE.md` and `README.md` (computed at Forge release time). Re-bootstrapping after pulling a new Forge version updates these manifests; bootstrap warns if the local Forge version is out of date.
+
+---
+
+## Generated File 3: settings.json
 
 ### Purpose
 Configure Claude Code behavior with stack-specific hooks and permissions.
@@ -413,7 +542,7 @@ Safe stack-specific commands that can auto-run:
 
 ---
 
-## Generated File 3: new-component.md
+## Generated File 4: new-component.md
 
 ### Purpose
 Skill that generates new components/screens following stack conventions.
@@ -547,7 +676,7 @@ class _WidgetNameState extends State<WidgetName> {
 
 ---
 
-## Generated File 4: new-model.md
+## Generated File 5: new-model.md
 
 ### Purpose
 Skill that generates new data models following database conventions.
@@ -653,7 +782,7 @@ export const articleFixtures = {
 
 ---
 
-## Generated File 5: new-test.md
+## Generated File 6: new-test.md
 
 ### Purpose
 Skill that generates new tests following stack conventions.
@@ -762,7 +891,7 @@ describe('Button', () => {
 
 ---
 
-## Generated File 6: frontend-code.md
+## Generated File 7: frontend-code.md
 
 ### Purpose
 Rules for frontend/UI code.
@@ -841,7 +970,7 @@ description: Code rules for frontend/UI code
 
 ---
 
-## Generated File 7: backend-code.md
+## Generated File 8: backend-code.md
 
 ### Purpose
 Rules for backend/API code.
@@ -926,7 +1055,7 @@ description: Code rules for backend/API code
 
 ---
 
-## Generated File 8: data-code.md
+## Generated File 9: data-code.md
 
 ### Purpose
 Rules for data models and database code.
@@ -995,7 +1124,7 @@ description: Code rules for data models and database schemas
 
 ---
 
-## Generated File 9: code-reviewer.md
+## Generated File 10: code-reviewer.md
 
 ### Purpose
 Custom code review checklist tailored to the stack.
@@ -1065,7 +1194,7 @@ When reviewing code, check:
 
 ---
 
-## Generated File 10: test-writer.md
+## Generated File 11: test-writer.md
 
 ### Purpose
 Custom test writing guidance tailored to the stack.
@@ -1198,7 +1327,12 @@ After generating all files, the skill performs these checks:
 - [ ] No syntax errors in code samples
 
 **Completeness:**
-- [ ] CLAUDE.md covers all sections
+- [ ] Root `CLAUDE.md` replaced (no "Claude Forge" references)
+- [ ] Root `CLAUDE.md` contains preserved blocks: provocation, context-management, compaction, context-thresholds, quality-scoring
+- [ ] Root `README.md` replaced (project-named, not "Claude Forge")
+- [ ] `docs/workflow-guide.md` deleted (content present in `CLAUDE.md`)
+- [ ] `.claude/backups/` contains pre-existing CLAUDE.md, README.md, workflow-guide.md
+- [ ] `.claude/rules/useful-tests.md` is present (preserved from Forge starter)
 - [ ] All four custom skills are generated
 - [ ] All three custom rules are generated
 - [ ] Both custom agents are generated
@@ -1206,15 +1340,17 @@ After generating all files, the skill performs these checks:
 - [ ] settings.json has permissions for stack
 
 **Consistency:**
-- [ ] Tech stack in CLAUDE.md matches ARCHITECTURE.md
+- [ ] Tech stack in `CLAUDE.md` matches `ARCHITECTURE.md`
+- [ ] Tech stack in `README.md` matches `CLAUDE.md`
 - [ ] All skill references match actual file locations
 - [ ] All hook commands are valid for the stack
 - [ ] All generated code samples match project conventions
+- [ ] `CLAUDE.md` references `.claude/rules/useful-tests.md` in its Testing section
 
 **Ready to Build:**
 - [ ] All files are in place
 - [ ] Project structure is clear
-- [ ] Development workflow is defined
+- [ ] Development workflow is defined (TDD-default, useful-tests gate)
 - [ ] Code patterns are documented
 
 ---
@@ -1224,7 +1360,12 @@ After generating all files, the skill performs these checks:
 When complete, bootstrap outputs:
 
 ```
-✓ Generated .claude/CLAUDE.md (project overview)
+✓ Backed up CLAUDE.md → .claude/backups/CLAUDE.md.<timestamp>
+✓ Backed up README.md → .claude/backups/README.md.<timestamp>
+✓ Backed up docs/workflow-guide.md → .claude/backups/workflow-guide.md.<timestamp>
+✓ Replaced root CLAUDE.md (project-specific + preserved workflow content)
+✓ Replaced root README.md (project-specific)
+✓ Deleted docs/workflow-guide.md (content inlined into CLAUDE.md)
 ✓ Updated .claude/settings.json (hooks + permissions)
 ✓ Generated .claude/skills/new-component.md
 ✓ Generated .claude/skills/new-model.md
@@ -1232,15 +1373,17 @@ When complete, bootstrap outputs:
 ✓ Generated .claude/rules/frontend-code.md
 ✓ Generated .claude/rules/backend-code.md
 ✓ Generated .claude/rules/data-code.md
+✓ Preserved .claude/rules/useful-tests.md (test quality rule)
 ✓ Updated .claude/agents/code-reviewer.md
 ✓ Updated .claude/agents/test-writer.md
 
 Your project is bootstrapped and ready to build!
 
 Next steps:
-1. Review .claude/CLAUDE.md to understand project setup
+1. Review root CLAUDE.md to understand project setup and workflow
 2. Run the project locally with the command in CLAUDE.md
-3. Start building with /dev <feature> or a specific task
+3. Start building with /dev <feature> (TDD-default per .claude/rules/useful-tests.md)
+4. Optional: /kanban-prep to export parallel-safe tasks for Cline Kanban
 ```
 
 ---

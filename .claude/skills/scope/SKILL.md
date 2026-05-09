@@ -13,9 +13,9 @@ This skill conducts an interactive discovery conversation to deeply understand w
 
 ## Overview
 
-Scoping is the foundation of successful development. This skill guides you through four discovery phases, asks clarifying follow-up questions, and outputs a structured project scope file that will drive all downstream decisions.
+Scoping is the foundation of successful development. This skill guides you through six phases — four discovery, one business framing, and one external pressure-test — asks clarifying follow-up questions, and outputs a structured project scope file that drives all downstream decisions.
 
-**Output:** `.claude/project-scope.json` — your project's foundational decisions.
+**Output:** `.claude/project-scope.json` — your project's foundational decisions, including a council-reviewed verdict on whether the scope is shippable as-defined.
 
 ---
 
@@ -31,7 +31,9 @@ The skill will guide you through a conversational discovery process. Answer natu
 
 ---
 
-## The Four Discovery Phases
+## The Six Phases
+
+> Phases 1–4 are discovery (vision, technical, constraints, MVP). Phase 5 distills business framing & V1/V2/V3. Phase 6 is an automatic council pressure-test before the scope is locked.
 
 ### Phase 1: Vision
 **Goal:** Understand what you're building, why, and for whom.
@@ -89,6 +91,22 @@ I'll ask about:
 
 ---
 
+### Phase 5: Business Framing & TLDR
+**Goal:** Distill the project into a one-paragraph elevator pitch and split features across three release tiers.
+
+I'll ask you for:
+- **TLDR (one sentence):** "What is this, in 25 words or fewer?"
+- **Business rationale:** Why does this matter? Who benefits? What's the business model (or "personal use", "internal tool", "OSS")? What changes if it succeeds?
+- **User stories:** For each V1 feature, the canonical "As a [user], I want [capability], so that [outcome]" form.
+- **V1 / V2 / V3 split:**
+  - **V1** = absolute minimum for value (you've already defined this in Phase 4 — confirm).
+  - **V2** = the next 3–5 features after V1 ships and gets feedback.
+  - **V3** = aspirational features. The "if everything goes right, here's where this goes" tier. Useful even if you never build it — it tells future-you what shape the project is supposed to grow into.
+
+**Checkpoint:** I'll repeat the TLDR and the V1 list back, and confirm: "If we shipped only V1, would that prove the value?"
+
+---
+
 ## Tech Stack Selection
 
 After gathering all context, I'll suggest a tech stack with clear reasoning:
@@ -105,6 +123,36 @@ You can override any suggestion — this is your project.
 
 ---
 
+## Phase 6: Council Pressure-Test
+
+**Goal:** Get a second opinion on the MVP cut, target user, and stack choice before locking them into the spec.
+
+After tech-stack confirmation, the skill automatically invokes `/llm-council` once per scope run. The exact prompt is versioned at `.claude/skills/scope/COUNCIL_PROMPT.md`. The council answers three questions:
+
+1. Is the MVP realistic for the team and timeline?
+2. Is the target user specific enough?
+3. Does the stack match the constraints, or is there a meaningfully better option?
+
+**Cost:** ~$0.50–$2 per invocation on Opus-tier. Fires once per `/scope` run (not per edit). I'll mention this before invoking so you can opt out if needed.
+
+**Output:** the council returns `top_concerns`, `stack_critique`, `mvp_critique`, and a `verdict` (`ship` / `revise` / `rethink`). I write this into the `council_review` block of `project-scope.json`.
+
+### How I respond to the verdict
+
+I do **not** auto-rerun the conversation. You decide.
+
+- **`ship`** — I show you the concerns (often empty), record `action_taken: accepted`, and move on.
+- **`revise`** — I show you the concerns and offer to loop back to the relevant phase (MVP, stack, target user) for one revision pass. If you agree, `action_taken: modified`. If you disagree, `action_taken: overrode` and the concerns persist into `PROJECT_SPEC.md` under a `Caveats` block (they re-surface at phase-review).
+- **`rethink`** — I treat this as `revise` with a stronger warning. Same options.
+
+I won't loop indefinitely. One revision pass max — you can re-run `/scope` from scratch if you need a deeper restart.
+
+### If `/llm-council` isn't installed
+
+I'll skip Phase 6, write `verdict: "skipped"` to `council_review`, warn you, and continue. `/spec` will work fine without it.
+
+---
+
 ## Output: project-scope.json
 
 At the end of the conversation, I'll generate `.claude/project-scope.json`:
@@ -113,10 +161,20 @@ At the end of the conversation, I'll generate `.claude/project-scope.json`:
 {
   "project_name": "string",
   "description": "string",
+  "tldr": "string",
   "problem_statement": "string",
   "target_users": "string",
   "vision_statement": "string",
+  "business_rationale": "string",
   "success_metrics": ["string"],
+
+  "user_stories": [
+    {
+      "as_a": "string",
+      "i_want": "string",
+      "so_that": "string"
+    }
+  ],
 
   "platforms": {
     "web": boolean,
@@ -152,6 +210,14 @@ At the end of the conversation, I'll generate `.claude/project-scope.json`:
     }
   ],
 
+  "features_v3": [
+    {
+      "name": "string",
+      "description": "string",
+      "rationale": "string"
+    }
+  ],
+
   "integrations": [
     {
       "service": "string",
@@ -174,11 +240,22 @@ At the end of the conversation, I'll generate `.claude/project-scope.json`:
   "offline_support_needed": boolean,
   "estimated_scale_day_1": "string",
 
+  "council_review": {
+    "verdict": "ship | revise | rethink",
+    "top_concerns": ["string"],
+    "stack_critique": "string",
+    "mvp_critique": "string",
+    "action_taken": "accepted | modified | overrode",
+    "reviewed_at": "ISO 8601 timestamp"
+  },
+
   "notes": "string",
   "conversation_date": "ISO 8601 timestamp",
   "scoped_by": "user identifier"
 }
 ```
+
+> **Note:** The `tldr`, `business_rationale`, `features_v3`, `user_stories`, and `council_review` fields are populated by Phase 5 (Business Framing) and Phase 6 (Council Pressure-Test), which run before the JSON is written. See the phase definitions above.
 
 ---
 

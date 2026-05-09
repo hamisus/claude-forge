@@ -7,7 +7,22 @@ description: "Session end ritual — commit, capture lessons, write handoff for 
 
 End-of-session skill that captures work, lessons, and state for the next session.
 
-## Workflow
+## Branch: are we inside a kanban-spawned worktree?
+
+**First action: check `KANBAN_CARD_ID`.**
+
+```bash
+echo "${KANBAN_CARD_ID:-}"
+```
+
+- **If `KANBAN_CARD_ID` is set** → run the **Kanban Card Completion path** (skip to "Kanban Card Completion" section below). The kanban app aggregates per-card state; this session must not stomp on the parent project's `transfer-context.json` or root `CLAUDE.md` Session Handoff section.
+- **If `KANBAN_CARD_ID` is empty** → run the standard workflow below (Steps 1–8). This is a normal single-session wrap-up.
+
+The env var is set by `/kanban-prep` in the worktree setup commands; if a user ran `claude` directly inside a worktree without it, no protection — the standard flow runs and may overwrite the parent state. The convention is documented in every card brief.
+
+---
+
+## Workflow (standard — single-session)
 
 ### 1. REVIEW WHAT CHANGED
 ```bash
@@ -195,9 +210,104 @@ Session captured. Next time you'll resume with:
 Suggested session name: 'user-search-phase2b'"
 ```
 
+## Kanban Card Completion (when `KANBAN_CARD_ID` is set)
+
+This path runs when the session is a kanban-spawned worktree handling a single card. The standard handoff steps are replaced with per-card reporting; the parent project's `transfer-context.json` and root `CLAUDE.md` are not touched.
+
+### 1. Review what changed (worktree-scoped)
+
+```bash
+git diff --stat
+git log --oneline -10
+```
+
+### 2. Capture lessons (per-card)
+
+Write lessons into the per-card report (Step 5 below), not into the parent `CLAUDE.md`. The card-completion aggregator will roll them up at phase-end.
+
+### 3. Stage & commit work in the worktree
+
+Same as the standard flow — get approval, then commit with TDD-aware message including `useful-tests-audit:` block.
+
+### 4. Run the Useful Tests Gate one more time
+
+Before declaring the card done, confirm the audit was performed for every commit on this worktree's branch (`git log --grep="useful-tests-audit:"`). If any commit lacks it, write a remediation note in the card report.
+
+### 5. Write per-card completion report
+
+Path: `.claude/kanban/completed/<KANBAN_CARD_ID>.md` (relative to **the worktree**, since this is the agent's working tree).
+
+```markdown
+# Card: <KANBAN_CARD_ID>
+
+**Title**: <from manifest>
+**Phase**: <from manifest>
+**Branch**: <git current branch>
+**Worktree path**: <pwd>
+**Completed at**: <ISO timestamp>
+
+## What was built
+- <bullet 1>
+- <bullet 2>
+
+## Files changed
+<git diff --stat output>
+
+## Useful Tests Audit
+- All commits on this branch include `useful-tests-audit:` block: ✅ / ❌
+- Tests added: <count>
+- TDD skips with reason: <count>
+- Useful-tests-skip overrides: <count>
+
+## Lessons (for parent rollup)
+- <lesson 1>
+- <lesson 2>
+
+## Open issues / blockers
+- <if any>
+
+## Acceptance criteria
+- [x] <each criterion from card brief>
+- [ ] <unmet, with reason>
+
+## Ready to merge
+- [ ] All acceptance criteria met
+- [ ] Tests green
+- [ ] Useful Tests Gate passed for every commit
+- [ ] No conflicts with `main` (`git merge-base` is recent)
+```
+
+### 6. DO NOT touch parent state
+
+Skip the standard wrap-up's:
+- ❌ Updating root `CLAUDE.md` Session Handoff section
+- ❌ Updating root `.claude/transfer-context.json`
+- ❌ Updating root `PHASES.md`
+
+These are owned by the parent project. The kanban aggregation step (run after all cards in a phase complete) reads `.claude/kanban/completed/*.md` and rolls them up into the parent state in one consolidated update.
+
+### 7. Suggest the merge action
+
+Present to the user:
+
+> Card `<id>` complete. To merge:
+>
+> ```bash
+> # From the parent project root:
+> git fetch
+> git checkout main && git pull
+> git merge --no-ff kanban/<id>
+> git worktree remove <worktree-path>
+> ```
+>
+> Or in Cline Kanban: move the card to "Done" / trash. Linked downstream cards will auto-start.
+
+---
+
 ## Key Principles
 1. **Ask before committing**: Always get user approval
 2. **Lessons matter**: Every session should add 1–3 lessons to the knowledge base
-3. **State is precise**: transfer-context.json must be accurate (next session depends on it)
-4. **Human and machine**: CLAUDE.md for humans, transfer-context.json for agents
+3. **State is precise**: `transfer-context.json` must be accurate (next session depends on it)
+4. **Human and machine**: `CLAUDE.md` for humans, `transfer-context.json` for agents
 5. **Traps to avoid**: Document things that took time or were non-obvious
+6. **Kanban-aware**: When `KANBAN_CARD_ID` is set, write per-card reports, never stomp on parent state

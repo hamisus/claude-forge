@@ -5,18 +5,32 @@ description: "Test-driven development workflow — RED → GREEN → REFACTOR cy
 
 # /tdd — Test-Driven Development
 
-Use this skill when you want to build features with test-driven development (TDD).
+**TDD is the default cycle for every unit built in `/dev`.** This skill describes how the cycle runs. To opt out for a specific unit, see "Override path" in `/dev` Step 4 — silent skips are forbidden.
 
-## When to Use TDD
-- ✅ Core business logic (benefits from having a contract)
-- ✅ APIs and data layers (easy to test, important to verify)
-- ✅ Libraries and utilities (reused across codebase)
-- ✅ Complex algorithms (tests verify correctness)
-- ❌ UI components (often harder to test; see stack-specific UI skills)
-- ❌ Configuration (usually not worth testing)
-- ❌ One-off scripts (can skip TDD)
+## When TDD is hardest (and what to do anyway)
 
-**Rule of thumb**: If you're building something that will be reused, tested by others, or has complex logic, use TDD.
+TDD applies everywhere; some places just need different test shapes:
+
+- **UI components** — write a smoke render test (RTL/widget-test/Playwright) that asserts what the user sees and can do. *Harder, not exempt.*
+- **Configuration / constants** — usually no behavior to test, so log `tdd-skip-reason: config-only edit` (and keep the change small enough that "config-only" is true).
+- **Throwaway scripts** — log `tdd-skip-reason: throwaway exploration`. If the script becomes load-bearing, write tests then.
+- **Migrations / schema changes** — write a migration test that runs up + down and asserts the resulting schema shape.
+- **External-service integration** — write a contract test against a mock that mirrors the real service's documented response shapes (this is what "useful" means here — see `.claude/rules/useful-tests.md`).
+
+**The rule isn't "test everything." The rule is: if there's behavior, a useful test exists for it. If there's no behavior, log the skip.**
+
+## What makes a test useful
+
+See `.claude/rules/useful-tests.md` for the full rubric. Short version:
+
+- ✅ Drives code through a public entry point (HTTP route, exported function, rendered component, CLI command).
+- ✅ Asserts on output a real consumer would see.
+- ✅ Fails when the implementation breaks in plausible ways.
+- ❌ Mocks the system under test.
+- ❌ Asserts only call counts (`toHaveBeenCalled`) with no behavioral check.
+- ❌ Tautologies, snapshot-only, assertion-less tests.
+
+**RED-phase tests must be useful by this definition.** A failing test that wouldn't catch a real bug is wasted RED. Write the test as if a stranger had to maintain the implementation.
 
 ## The TDD Cycle
 
@@ -185,9 +199,11 @@ SKILL: "TDD cycle complete! All tests passing, code is clean."
 - ❌ Bad: "test that function calls database.query() exactly once"
 - ✅ Good: "test that function returns 10 results for this query"
 
-❌ **Write tests that are too loose**: Tests should catch real bugs
+❌ **Write tests that are too loose**: Tests should catch real bugs (per `.claude/rules/useful-tests.md`)
 - ❌ Bad: "test that search returns something"
-- ✅ Good: "test that search returns specific users for specific query"
+- ❌ Bad: "test that search calls db.query()" (call count without behavior check)
+- ❌ Bad: snapshot-only test of search results
+- ✅ Good: "test that search returns specific users for specific query, with stable order, and excludes soft-deleted rows"
 
 ❌ **Refactor without running tests**: Always verify tests still pass after refactoring
 - If you change code and tests fail, you've changed behavior.
@@ -195,10 +211,24 @@ SKILL: "TDD cycle complete! All tests passing, code is clean."
 ❌ **Add new features during refactoring**: Refactoring is only for improving existing code
 - If you want a new feature, write new tests first (go back to RED phase).
 
+## Useful Tests Verification
+
+Before the final commit (after GREEN, before REFACTOR is fully landed), `/dev` runs the **Useful Tests Gate** — a three-step audit defined in `.claude/rules/useful-tests.md`:
+
+1. **Mechanical scan** — grep for smell patterns.
+2. **Coverage map** — every new source unit must have at least one test referencing it.
+3. **Judgment pass** — for each new test, name one plausible mutation it would not catch. Document in commit body under `useful-tests-audit:`.
+
+The gate fails if:
+- A new test passes the mechanical scan only by coincidence (e.g., `expect(spy).toHaveBeenCalledOnce()` with no behavioral follow-up).
+- A new source unit has zero referencing tests.
+- A test admits it would not catch an obvious mutation.
+
+When the gate fails: strengthen the test, or log `useful-tests-skip-reason:` in the commit footer (audit visible to phase-review; >20% rate triggers a discussion).
+
 ## Integration with /dev Skill
-- Use `/dev` for overall feature workflow
-- Use `/tdd` within `/dev` for specific features
-- Example workflow: `/dev` calls `/tdd` for the data layer, then stack-specific skills for UI
+
+`/dev` defaults to `/tdd` for every unit. `/tdd` is no longer opt-in — it's the cycle the unit runs through unless a `tdd-skip-reason` is logged. Stack-specific implementation skills (e.g., `/new-component`) typically run inside `/tdd`'s GREEN phase, generating code to satisfy the failing tests written in RED.
 
 ## Integration with /debug Skill
 - If tests fail and it's not obvious why, use `/debug` to diagnose

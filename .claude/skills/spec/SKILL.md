@@ -33,8 +33,51 @@ A good spec doesn't over-document. It provides just enough detail for a Claude C
 The skill will:
 1. Read `.claude/project-scope.json`
 2. Ask clarifying questions about features, data, and architecture
-3. Generate the four spec documents in `.claude/specs/`
-4. Verify all documents are complete and consistent
+3. **Research libraries for major capability areas via `ctx7`** (see "Library Research" below)
+4. Generate the four spec documents in `.claude/specs/`
+5. Verify all documents are complete and consistent
+
+### Flags
+
+- `/spec --skip-research` — skip the library research step (faster; use only when stack is fully settled and you're regenerating specs).
+
+---
+
+## Library Research (Step 3)
+
+After reading scope and clarifying questions, but before generating spec documents, the skill identifies **major capability areas** that need library choices and runs `ctx7` to ground recommendations in current docs.
+
+### Major capability areas
+
+Drawn from `tech_stack` and `integrations` in `project-scope.json`. Common areas:
+
+- **Auth** (e.g., NextAuth vs Clerk vs Supabase Auth vs Lucia)
+- **Database / ORM** (e.g., Prisma vs Drizzle vs Kysely; PostgreSQL vs SQLite vs MongoDB)
+- **State management** (e.g., Zustand vs Redux Toolkit vs Jotai vs Context-only)
+- **Forms** (e.g., react-hook-form vs Formik vs TanStack Form)
+- **Payments** (e.g., Stripe vs Lemon Squeezy vs Paddle)
+- **Real-time** (e.g., Pusher vs Ably vs Supabase Realtime vs raw WebSocket)
+- **AI integrations** (e.g., Anthropic SDK vs OpenAI SDK vs AI SDK by Vercel)
+- **Testing** (e.g., Vitest vs Jest; Playwright vs Cypress)
+
+### Process
+
+For each capability area (capped at **6 areas per spec run** to keep cost bounded):
+
+1. Run `npx ctx7@latest library "<library-name>" "<capability question>"` to resolve current ID for each candidate.
+2. Run `npx ctx7@latest docs <libraryId> "<specific question>"` for the top 1–2 candidates to fetch current API surface and gotchas.
+3. Cache the fetched docs to `.claude/specs/.ctx7-cache/<library>.md` so re-runs don't re-fetch.
+4. Synthesize 2–3 candidates with tradeoffs into the **Stack Rationale** subsection of `ARCHITECTURE.md`.
+
+### When the user has already chosen
+
+If `tech_stack.reasoning` already names specific libraries with conviction (e.g., "must use Prisma — team standard"), skip the alternatives research for that area; still fetch current docs for the chosen library to surface API highlights and pitfalls.
+
+### Cost expectations
+
+- ~5–10 ctx7 fetches per spec run.
+- ~10–30k extra tokens, ~30–90s extra wall time.
+- Worth it once per project. Use `--skip-research` for fast regeneration.
 
 ---
 
@@ -91,6 +134,12 @@ For each feature:
 - User can [action]
 - System correctly [behavior]
 - Performance: [requirement]
+
+**Useful Test Outline:** *(per `.claude/rules/useful-tests.md`)*
+3–5 concrete test names that verify real behavior. Test contracts, not test code. These drive `/dev` (TDD-default) and `/phase-review` (Test Quality dimension).
+- `<entry-point> with <input> returns <observable outcome>` (e.g., `POST /api/users with duplicate email returns 409 + body.code === DUPLICATE_EMAIL`)
+- `<edge case from above> handled by <expected behavior>` (one per documented edge case)
+- `<happy path> end-to-end produces <persisted/visible result>` (at least one e2e per feature)
 
 **Metrics:** How will success be measured?
 ```
@@ -175,6 +224,31 @@ For each tech choice (frontend framework, backend runtime, database, etc):
 - What problems does it solve for this project?
 - Known limitations or trade-offs
 - Migration path if it becomes wrong
+
+**Stack Rationale (Library Research)** *(populated by Step 3 — Library Research)*
+
+For each major capability area (auth, database/ORM, state mgmt, forms, payments, real-time, AI, testing — whichever apply):
+
+```
+### <Capability Area>
+
+**Candidates considered:**
+1. **<Library A>** — version <X.Y>. Strengths: <…>. Weaknesses: <…>.
+2. **<Library B>** — version <X.Y>. Strengths: <…>. Weaknesses: <…>.
+3. **<Library C>** *(brief mention if relevant)*
+
+**Recommendation:** <library + reason tied to constraints>
+
+**Current API highlights** *(from ctx7 fetch — cached at `.claude/specs/.ctx7-cache/<lib>.md`)*:
+- <Key API or pattern the team will hit early>
+- <Another key API or pattern>
+
+**Common pitfalls:**
+- <Known footgun #1 from current docs>
+- <Known footgun #2>
+```
+
+This section is grounded in current documentation (not training data). Re-run `/spec` to refresh; the cache prevents redundant fetches.
 
 **Layer Architecture**
 
@@ -267,14 +341,25 @@ Each feature phase includes:
 - [ ] Feature B
 
 **Work Items:**
-- Backend: [task 1], [task 2]
-- Frontend: [task 3], [task 4]
-- Testing: [task 5]
+
+Each item carries an annotation: `{parallel-safe: true|false, depends-on: [<id>...], estimated-units: <n>}`.
+- `parallel-safe: true` means this item can run in its own worktree alongside other parallel-safe items in the same phase.
+- `depends-on` lists work-item IDs (within or across phases) that must complete first.
+- IDs are stable: `<phase>.<short-slug>` (e.g., `phase-2.api-scaffold`).
+
+- [ ] **phase-N.task-1** Backend: [description] `{parallel-safe: true, depends-on: [phase-1.api-scaffold], estimated-units: 2}`
+- [ ] **phase-N.task-2** Frontend: [description] `{parallel-safe: true, depends-on: [phase-1.ui-shell], estimated-units: 2}`
+- [ ] **phase-N.task-3** Backend: [description] `{parallel-safe: false, depends-on: [phase-N.task-1]}`
+- [ ] **phase-N.task-4** Testing: [description] `{parallel-safe: false, depends-on: [phase-N.task-1, phase-N.task-2]}`
+
+> Items marked `parallel-safe: true` with no shared dependencies are candidates for `/kanban-prep` to export as parallel cards.
 
 **Dependencies:** Must complete Phase M first
 
 **Verification Checklist:**
-- [ ] All tests pass
+- [ ] All tests pass *(per `.claude/rules/useful-tests.md`)*
+- [ ] Each feature has ≥1 useful end-to-end test
+- [ ] Documented edge cases have tests
 - [ ] Manual testing of flows
 - [ ] No console errors
 - [ ] Performance acceptable
@@ -441,11 +526,15 @@ After generating specs, I'll verify:
 
 - [ ] All v1 features are documented
 - [ ] Each feature has clear success criteria
+- [ ] Each feature has a **Useful Test Outline** with ≥3 contracts and ≥1 e2e
 - [ ] Data models are complete and consistent
 - [ ] API routes match data model operations
 - [ ] Architecture decisions are justified
+- [ ] **Stack Rationale** populated for every major capability area (or `--skip-research` was used)
+- [ ] `.claude/specs/.ctx7-cache/` contains entries for fetched libraries
 - [ ] Immutable decisions are clearly marked
 - [ ] Phases are sized appropriately (1-3 sessions each)
+- [ ] **Every PHASES.md work item carries `parallel-safe`, `depends-on`, `estimated-units` annotations**
 - [ ] Phase 1 is foundation only
 - [ ] Phase N (final) is polish & deployment
 - [ ] All JSON and code samples are valid syntax

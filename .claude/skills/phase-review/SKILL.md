@@ -74,12 +74,19 @@ Look for:
 - Dead code paths
 - Old comments or commented-out code
 
-#### E. Test Coverage
+#### E. Test Quality
+Audit per `.claude/rules/useful-tests.md` — line coverage % is **not** the primary metric.
+
 Check:
-- Are critical paths tested?
-- Are edge cases covered?
-- Are error cases tested?
-- Overall: what's the test coverage %?
+- Does every shipped feature have ≥1 useful end-to-end test (drives a public entry point, asserts on observable output)?
+- Does every documented edge case from `PROJECT_SPEC.md` have a test?
+- Do new source units each have ≥1 referencing test (per the Coverage Map step)?
+- Does every commit on this phase's branch include a `useful-tests-audit:` block in its body? (`git log --grep="useful-tests-audit:"` — count vs. total commit count.)
+- Smell scan: any tautologies, snapshot-only tests, mocks-of-SUT, `toHaveBeenCalled`-only tests, vague `it("works")` titles?
+- TDD-skip rate: count `tdd-skip-reason:` entries on the phase's commits. If >20%, surface for discussion.
+- Useful-tests-skip rate: count `useful-tests-skip-reason:` entries. If >5%, the gate is being bypassed too often — investigate.
+
+Goal: tests that would catch plausible mutations of the implementation, not tests that pad coverage numbers.
 
 ### 4. AUDIT CLAUDE.MD FILES
 Review all CLAUDE.md files for accuracy:
@@ -157,15 +164,24 @@ Score the phase on 5 dimensions (each 0–20, max 100):
 |-----------|-----------|-------|
 | **Completeness** | All planned tasks done? Any scope creep? | /20 |
 | **Code Quality** | Is code clean, readable, maintainable? | /20 |
-| **Test Coverage** | Are critical paths tested? | /20 |
+| **Test Quality** | Useful tests per `.claude/rules/useful-tests.md`? E2E per feature? Edge cases covered? Audit blocks present? | /20 |
 | **Design/UX** | Does feature work well? Intuitive? | /20 |
 | **Documentation** | Is work documented? Lessons captured? | /20 |
 
-Scoring guide:
+General scoring guide:
 - 16–20: Excellent, no concerns
 - 11–15: Good, minor issues
 - 6–10: Acceptable, some concerns
 - 0–5: Poor, significant issues
+
+**Test Quality rubric** (specifically):
+| Score | What it means |
+|------:|---------------|
+|   0–5 | Many tautologies; no e2e for any feature; audit blocks missing or rubber-stamped. |
+|  6–10 | Mixed — some useful tests, some smells. Skip-rate >20%. |
+| 11–15 | Most features have useful tests, but e2e coverage is patchy or some edge cases untested. |
+|    16 | Every shipped feature has ≥1 useful end-to-end test + per-unit useful tests. Audit blocks present and concrete. |
+|    20 | All of the above + every documented edge case from `PROJECT_SPEC.md` has a test. TDD-skip and useful-tests-skip rates both <5%. |
 
 Example scorecard:
 ```
@@ -173,7 +189,7 @@ Quality Gate Score: Phase 2b
 
 Completeness: 18/20 (all tasks done, 1 minor scope creep)
 Code Quality: 15/20 (clean code, but 1 file >300 lines)
-Test Coverage: 17/20 (good coverage, missing error case tests)
+Test Quality: 16/20 (e2e per feature, audit blocks present, but 2 documented edge cases untested)
 Design/UX: 19/20 (API works well, excellent pagination)
 Documentation: 15/20 (lessons captured, but CLAUDE.md could be more detailed)
 
@@ -196,7 +212,7 @@ Recommendation: Ready for next phase
 - Suggest fixes for each:
   - Low completeness: finish remaining tasks
   - Low code quality: refactor large files
-  - Low test coverage: write missing tests
+  - Low test quality: strengthen tests per `.claude/rules/useful-tests.md` (add e2e, cover edge cases, replace tautologies, ensure audit blocks present)
   - Low design/UX: iterate based on feedback
   - Low documentation: capture lessons and decisions
 
@@ -206,11 +222,13 @@ Quality Gate: 72/100 (FAIL — below 80 threshold)
 
 Issues:
 - Code Quality (12/20): src/api/users.ts is 450 lines, needs splitting
-- Test Coverage (10/20): error cases not tested
+- Test Quality (10/20): no e2e tests; useful-tests-audit blocks rubber-stamped on 4 commits; 3 edge cases from PROJECT_SPEC.md untested
 
 Recommendations:
 1. Split src/api/users.ts into endpoint.ts + validation.ts + handlers.ts
-2. Add tests for error cases (network failure, invalid input, timeout)
+2. Add an e2e test that drives the full user-search flow (HTTP request → DB read-back → response shape)
+3. Cover the 3 untested edge cases (empty query, sql-injection-shaped query, pagination beyond last page)
+4. Re-do the useful-tests-audit on the 4 rubber-stamped commits with concrete mutation answers
 
 Estimated effort: 4 hours
 Suggest: Fix these before moving to Phase 2c

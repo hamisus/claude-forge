@@ -41,6 +41,7 @@ After bootstrap, start building:
 - `@test-writer` — Delegated test generation
 - `@doc-keeper` — Documentation maintenance
 
+<!-- BOOTSTRAP_PRESERVE_BEGIN: provocation -->
 ## Prompting Techniques
 
 When output feels mediocre, use provocation prompts:
@@ -49,7 +50,9 @@ When output feels mediocre, use provocation prompts:
 - "Prove to me this works"
 - "What would a senior engineer critique about this approach?"
 - "Is there a simpler way that we're not seeing?"
+<!-- BOOTSTRAP_PRESERVE_END: provocation -->
 
+<!-- BOOTSTRAP_PRESERVE_BEGIN: context-management -->
 ## Context Management
 
 - Name sessions descriptively: `phase1-auth-system`, `phase2-dashboard`
@@ -58,7 +61,9 @@ When output feels mediocre, use provocation prompts:
 - Don't push past 80% — quality degrades
 - Delegate verbose operations to subagents
 - Use `claude --worktree <name>` for parallel features
+<!-- BOOTSTRAP_PRESERVE_END: context-management -->
 
+<!-- BOOTSTRAP_PRESERVE_BEGIN: compaction -->
 ### Compaction Instructions
 
 When compacting (`/compact`), always preserve:
@@ -69,6 +74,7 @@ When compacting (`/compact`), always preserve:
 - Open questions or blockers
 - The current implementation plan
 - Session handoff notes
+<!-- BOOTSTRAP_PRESERVE_END: compaction -->
 
 ## Session Handoff
 
